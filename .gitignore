@@ -1,0 +1,49 @@
+############
+# Class Files
+############
+
+*.class
+
+############
+# Package Files
+############
+
+*.jar
+*.war
+*.ear
+
+############
+# NetBeans specific
+############
+
+
+#################
+## IntelliJ
+#################
+
+*.iml
+/.idea
+
+############
+## Windows
+############
+
+# Windows image file caches
+Thumbs.db
+
+# Folder config file
+Desktop.ini
+
+############
+## Mac
+############
+
+*.DS_STORE
+
+############
+## Maven
+############
+
+/build/
+/target/
+dependency-reduced-pom.xml
