@@ -7,7 +7,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.Calendar;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,20 +17,14 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class Server {
 
-    /*  */
     private static final int SIZE = 2 * 1024;
     private static final ConcurrentHashMap<SocketChannel, Client> clients = new ConcurrentHashMap<>();
     private static final ByteBuffer readBuffer = ByteBuffer.allocateDirect(SIZE);
 
     public static class Client {
 
-        private final SocketChannel socket;
         private final ConcurrentLinkedQueue<ByteBuffer> queue = new ConcurrentLinkedQueue<>();
         private final ByteBuffer buffer = ByteBuffer.allocate(SIZE);
-
-        public Client(SocketChannel socket) {
-            this.socket = socket;
-        }
 
         public ConcurrentLinkedQueue<ByteBuffer> getQueue() {
             return queue;
@@ -41,16 +34,26 @@ public class Server {
             return buffer;
         }
 
-        public boolean process(ByteBuffer read) throws IOException {
+        public boolean process(ByteBuffer read) {
             if (read.limit() > buffer.remaining()) {
-                socket.close();
                 buffer.clear();
                 return true;
             }
             buffer.put(read);
             RequestType request = RequestType.getRequestType(buffer.array(), buffer.position());
-            System.out.print("\n[" + request.name() + " | " + request.hasTerminated(buffer.array(), buffer.position()) + "]\n");
-            System.out.println(new String(buffer.array(), 0, buffer.position()));
+            System.out.print("\n" + request.name() + " | " + request.hasTerminated(buffer.array(), buffer.position()) + "\n");
+            switch (request) {
+                case INCOMPLETE:
+                    System.out.println("Incomplete chunk...");
+                    break;
+                case ERRONEOUS:
+                    System.out.println("Erroneous data.");
+                    buffer.clear();
+                    return true;
+                default:
+                    System.out.println(new String(buffer.array(), 0, buffer.position()));
+
+            }
             if (request.hasTerminated(buffer.array(), buffer.position())) {
                 buffer.clear();
             }
@@ -98,12 +101,13 @@ public class Server {
         SocketChannel sc = ssc.accept();
         sc.configureBlocking(false);
         sc.register(key.selector(), SelectionKey.OP_READ);
-        clients.put(sc, new Client(sc));
+        clients.put(sc, new Client());
         System.out.println("Connected to " + sc.getRemoteAddress().toString());
     }
 
     public static void read(SelectionKey key) throws IOException {
         SocketChannel socket = (SocketChannel) key.channel();
+        readBuffer.clear();
         int read = -1;
         try {
             read = socket.read(readBuffer);
@@ -121,10 +125,27 @@ public class Server {
         }
 
         readBuffer.flip();
-        clients.get(socket).process(readBuffer);
-        readBuffer.clear();
+        if (clients.get(socket).process(readBuffer)) {
+            System.out.println("Erroneous data, closing connection to " + socket.getRemoteAddress().toString());
+            clients.remove(socket);
+            socket.close();
+            return;
+        }
 
-        byte[] message = generateResponse(ResponseType.OK, "<h1>JANIOS welcomes " + socket.getRemoteAddress().toString() + " at this hour of " + Calendar.getInstance().get(Calendar.HOUR) + "</h1>");
+        byte[] message = generateResponse(ResponseType.OK, "<!DOCTYPE html>\n"
+                + "<html>\n"
+                + "<body>\n"
+                + "<form action=\".\\\" method=\"POST\">\n"
+                + "First name:<br>\n"
+                + "<input type=\"text\" name=\"firstname\" value=\"Mickey\">\n"
+                + "<br>\n"
+                + "Last name:<br>\n"
+                + "<input type=\"text\" name=\"lastname\" value=\"Mouse\">\n"
+                + "<br><br>\n"
+                + "<input type=\"submit\" value=\"Submit\">\n"
+                + "</form> \n"
+                + "</body>\n"
+                + "</html>");
         ByteBuffer writeBuffer = ByteBuffer.allocate(message.length);
         writeBuffer.put(message);
         writeBuffer.flip();
@@ -154,5 +175,42 @@ public class Server {
                 + "Content-Type: text/html\n"
                 + "Server: JANIOS\n\n"
                 + page).getBytes();
+    }
+
+    /**
+     * Searches the base array for an occurrence of the term array. Performance
+     * is okayish, it tries to jump as far as it can after a mismatch.
+     *
+     * @param base the array to search in
+     * @param baseOffset the offset to start searching in the base array
+     * @param baseLimit the limit to search to in the base array
+     * @param term the array to search for
+     * @return the index of where the term array begins, -1 if the term array
+     * could not be found in the base array
+     */
+    public static int indexOf(byte[] base, int baseOffset, int baseLimit, byte[] term) {
+        int f;
+        for (int i = baseOffset; i < baseLimit; i++) {
+            f = 0;
+            for (int j = 0; j < term.length; j++) {
+                if (base[j + i] == term[j]) { // Match?
+                    if (j == term.length - 1) { // Finished searching?
+                        return i;
+                    } else if (f == 0 && term[0] == term[j]) {
+                        f = j;
+                    }
+                } else { // Missmatch
+                    if (j > 0) {
+                        if (f > 0) {
+                            i += f - 1;
+                            break;
+                        }
+                        i += j - 1;
+                    }
+                    break;
+                }
+            }
+        }
+        return -1;
     }
 }
