@@ -10,35 +10,15 @@ public enum RequestType {
 
     CONNECT("CONNECT"),
     DELETE("DELETE"),
-    GET("GET") {
-                @Override
-                public boolean hasTerminated(byte[] builder, int limit) {
-                    return limit > 1
-                            ? builder[limit - 1] == 0x0A
-                            && builder[limit - 2] == 0x0D
-                            && builder[limit - 3] == 0x0A
-                            && builder[limit - 4] == 0x0D
-                            : false;
-                }
-            },
+    GET("GET"),
     HEAD("HEAD"),
     OPTIONS("OPTIONS"),
     PATCH("PATCH"),
     POST("POST"),
     PUT("PUT"),
     TRACE("TRACE"),
-    INCOMPLETE("INCOMPLETE") {
-                @Override
-                public boolean hasTerminated(byte[] builder, int limit) {
-                    return false;
-                }
-            },
-    ERRONEOUS("ERRONEOUS") {
-                @Override
-                public boolean hasTerminated(byte[] builder, int limit) {
-                    return true;
-                }
-            };
+    INCOMPLETE("*"),
+    ERRONEOUS("*");
 
     private final byte[] identifier;
 
@@ -60,10 +40,24 @@ public enum RequestType {
         this.identifier = ident;
     }
 
-    public boolean hasTerminated(byte[] builder, int limit) {
-        throw new UnsupportedOperationException("RequestType" + this.name() + " does not implement this method.");
+    /**
+     * Gets the length of the request type's identifier.
+     *
+     * @return the length of the request type's identifier
+     */
+    public int length() {
+        return identifier.length;
     }
 
+    /**
+     * Parses the base array for a request type if one is present.
+     *
+     * @param base the base array to scan
+     * @param baseLimit the length of usable data in the base array
+     * @return the request type present in the base array. If one is is not
+     * present, ERRONEOUS is returned. If there isn't enough data in the base
+     * array to check, INCOMPLETE is returned.
+     */
     public static RequestType getRequestType(byte[] base, int baseLimit) {
         if (baseLimit < 3) {
             return INCOMPLETE;
@@ -101,7 +95,7 @@ public enum RequestType {
      * Checks if the given type is in the front of the base.
      *
      * @param base the array of data
-     * @param baseLimit the limit for the array of data
+     * @param baseLimit the length of usable data in the base array
      * @param type the type to check for
      * @return if there isn't enough information then INCOMPLETE is returned,
      * else if the information doesn't match that of what's expected for the

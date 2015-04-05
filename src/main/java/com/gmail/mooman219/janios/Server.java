@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class Server {
 
-    private static final int SIZE = 2 * 1024;
+    private static final int SIZE = 3 * 1024;
     private static final ConcurrentHashMap<SocketChannel, Client> clients = new ConcurrentHashMap<>();
     private static final ByteBuffer readBuffer = ByteBuffer.allocateDirect(SIZE);
 
@@ -36,26 +36,23 @@ public class Server {
 
         public boolean process(ByteBuffer read) {
             if (read.limit() > buffer.remaining()) {
+                System.out.println("Overflow");
                 buffer.clear();
                 return true;
             }
             buffer.put(read);
-            RequestType request = RequestType.getRequestType(buffer.array(), buffer.position());
-            System.out.print("\n" + request.name() + " | " + request.hasTerminated(buffer.array(), buffer.position()) + "\n");
-            switch (request) {
+            Request request = Request.parse(buffer.array(), buffer.position());
+            System.out.print("\n" + request.toString() + "\n");
+            switch (request.getRequestType()) {
                 case INCOMPLETE:
-                    System.out.println("Incomplete chunk...");
+                    System.out.println("Incomplete data");
                     break;
                 case ERRONEOUS:
-                    System.out.println("Erroneous data.");
+                    System.out.println("Erroneous data");
                     buffer.clear();
                     return true;
                 default:
                     System.out.println(new String(buffer.array(), 0, buffer.position()));
-
-            }
-            if (request.hasTerminated(buffer.array(), buffer.position())) {
-                buffer.clear();
             }
             return false;
         }
@@ -126,31 +123,31 @@ public class Server {
 
         readBuffer.flip();
         if (clients.get(socket).process(readBuffer)) {
-            System.out.println("Erroneous data, closing connection to " + socket.getRemoteAddress().toString());
+            System.out.println("Closing erronous connection to " + socket.getRemoteAddress().toString());
             clients.remove(socket);
             socket.close();
             return;
         }
 
-        byte[] message = generateResponse(ResponseType.OK, "<!DOCTYPE html>\n"
-                + "<html>\n"
-                + "<body>\n"
-                + "<form action=\".\\\" method=\"POST\">\n"
-                + "First name:<br>\n"
-                + "<input type=\"text\" name=\"firstname\" value=\"Mickey\">\n"
-                + "<br>\n"
-                + "Last name:<br>\n"
-                + "<input type=\"text\" name=\"lastname\" value=\"Mouse\">\n"
-                + "<br><br>\n"
-                + "<input type=\"submit\" value=\"Submit\">\n"
-                + "</form> \n"
-                + "</body>\n"
-                + "</html>");
-        ByteBuffer writeBuffer = ByteBuffer.allocate(message.length);
-        writeBuffer.put(message);
-        writeBuffer.flip();
-        clients.get(socket).getQueue().add(writeBuffer);
-        socket.register(key.selector(), SelectionKey.OP_WRITE);
+//        byte[] message = generateResponse(ResponseType.OK, "<!DOCTYPE html>\n"
+//                + "<html>\n"
+//                + "<body>\n"
+//                + "<form action=\".\\\" method=\"POST\">\n"
+//                + "First name:<br>\n"
+//                + "<input type=\"text\" name=\"firstname\" value=\"Mickey\">\n"
+//                + "<br>\n"
+//                + "Last name:<br>\n"
+//                + "<input type=\"text\" name=\"lastname\" value=\"Mouse\">\n"
+//                + "<br><br>\n"
+//                + "<input type=\"submit\" value=\"Submit\">\n"
+//                + "</form> \n"
+//                + "</body>\n"
+//                + "</html>");
+//        ByteBuffer writeBuffer = ByteBuffer.allocate(message.length);
+//        writeBuffer.put(message);
+//        writeBuffer.flip();
+//        clients.get(socket).getQueue().add(writeBuffer);
+//        socket.register(key.selector(), SelectionKey.OP_WRITE);
     }
 
     public static void write(SelectionKey key) throws IOException {
