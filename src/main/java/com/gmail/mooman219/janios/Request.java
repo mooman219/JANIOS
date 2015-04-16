@@ -73,7 +73,7 @@ public class Request {
         String requestURL = new String(base, start, end - start);
 
         /**
-         * Parse the http version
+         * Parse the http version.
          */
         start = ++position;
         end = 0;
@@ -91,9 +91,5 @@ public class Request {
         String httpVersion = new String(base, start, end - start);
 
         return new Request(requestType, requestURL, httpVersion);
-    }
-
-    private static boolean compare(byte[] base, int baseIndex, int baseLimit, byte value) {
-        return baseIndex < baseLimit ? base[baseIndex] == value : false;
     }
 }

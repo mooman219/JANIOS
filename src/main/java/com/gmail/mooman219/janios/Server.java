@@ -7,7 +7,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -16,6 +18,20 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * @author Joseph Cumbo (mooman219)
  */
 public class Server {
+
+    public static final Charset ascii;
+
+    static {
+        Map<String, Charset> charsets = Charset.availableCharsets();
+        if (charsets.containsKey("US-ASCII")) {
+            ascii = charsets.get("US-ASCII");
+        } else if (charsets.containsKey("ASCII")) {
+            ascii = charsets.get("ASCII");
+        } else {
+            throw new Error("System unable to encode to ASCII.");
+        }
+        System.out.println("Found charset " + ascii.displayName());
+    }
 
     private static final int SIZE = 3 * 1024;
     private static final ConcurrentHashMap<SocketChannel, Client> clients = new ConcurrentHashMap<>();

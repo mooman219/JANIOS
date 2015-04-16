@@ -1,8 +1,5 @@
 package com.gmail.mooman219.janios;
 
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.Charset;
-
 /**
  * @author Joseph Cumbo (mooman219)
  */
@@ -23,21 +20,7 @@ public enum RequestType {
     private final byte[] identifier;
 
     private RequestType(String identifier) {
-        byte[] ident;
-        /**
-         * Since the HTML standard is ASCII, we really need to be able support
-         * that character set on this machine.
-         */
-        try {
-            if (Charset.isSupported("ASCII")) {
-                ident = identifier.getBytes("ASCII");
-            } else {
-                ident = identifier.getBytes("US-ASCII");
-            }
-        } catch (UnsupportedEncodingException ex) {
-            throw new Error("System unable to encode to ASCII.");
-        }
-        this.identifier = ident;
+        this.identifier = identifier.getBytes(Server.ascii);
     }
 
     /**
