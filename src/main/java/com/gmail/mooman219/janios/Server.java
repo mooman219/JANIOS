@@ -12,67 +12,32 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * @author Joseph Cumbo (mooman219)
  */
 public class Server {
 
-    public static final Charset ascii;
+    public static final Charset ASCII;
+    public static final int BUFFER_SIZE = 3 * 1024;
+    public static final BufferPool BUFFER_POOL = new BufferPool(BUFFER_SIZE, 1024);
 
     static {
         Map<String, Charset> charsets = Charset.availableCharsets();
         if (charsets.containsKey("US-ASCII")) {
-            ascii = charsets.get("US-ASCII");
+            ASCII = charsets.get("US-ASCII");
         } else if (charsets.containsKey("ASCII")) {
-            ascii = charsets.get("ASCII");
+            ASCII = charsets.get("ASCII");
         } else {
             throw new Error("System unable to encode to ASCII.");
         }
-        System.out.println("Found charset " + ascii.displayName());
+        System.out.println("Found charset " + ASCII.displayName());
+        System.out.println("Buffer size: " + BUFFER_SIZE);
+        System.out.println("Buffer pool capacity: " + BUFFER_POOL.getCapacity());
     }
 
-    private static final int SIZE = 3 * 1024;
     private static final ConcurrentHashMap<SocketChannel, Client> clients = new ConcurrentHashMap<>();
-    private static final ByteBuffer readBuffer = ByteBuffer.allocateDirect(SIZE);
-
-    public static class Client {
-
-        private final ConcurrentLinkedQueue<ByteBuffer> queue = new ConcurrentLinkedQueue<>();
-        private final ByteBuffer buffer = ByteBuffer.allocate(SIZE);
-
-        public ConcurrentLinkedQueue<ByteBuffer> getQueue() {
-            return queue;
-        }
-
-        public ByteBuffer getBuffer() {
-            return buffer;
-        }
-
-        public boolean process(ByteBuffer read) {
-            if (read.limit() > buffer.remaining()) {
-                System.out.println("Overflow");
-                buffer.clear();
-                return true;
-            }
-            buffer.put(read);
-            Request request = Request.parse(buffer.array(), buffer.position());
-            System.out.print("\n" + request.toString() + "\n");
-            switch (request.getRequestType()) {
-                case INCOMPLETE:
-                    System.out.println("Incomplete data");
-                    break;
-                case ERRONEOUS:
-                    System.out.println("Erroneous data");
-                    buffer.clear();
-                    return true;
-                default:
-                    System.out.println(new String(buffer.array(), 0, buffer.position()));
-            }
-            return false;
-        }
-    }
+    private static final ByteBuffer readBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
 
     /**
      * Prints the given buffer in hex format from the 0 position to the limit.
@@ -114,7 +79,7 @@ public class Server {
         SocketChannel sc = ssc.accept();
         sc.configureBlocking(false);
         sc.register(key.selector(), SelectionKey.OP_READ);
-        clients.put(sc, new Client());
+        clients.put(sc, new Client(sc));
         System.out.println("Connected to " + sc.getRemoteAddress().toString());
     }
 
@@ -130,18 +95,19 @@ public class Server {
              * connection anyway.
              */
         }
+        Client client = clients.get(socket);
         if (read == -1) {
             System.out.println("Lost connection to " + socket.getRemoteAddress().toString());
+            client.close();
             clients.remove(socket);
-            socket.close();
             return;
         }
 
         readBuffer.flip();
         if (clients.get(socket).process(readBuffer)) {
             System.out.println("Closing erronous connection to " + socket.getRemoteAddress().toString());
+            client.close();
             clients.remove(socket);
-            socket.close();
             return;
         }
 
@@ -187,43 +153,6 @@ public class Server {
         return ("HTTP/1.0 " + responceType.getStatus() + "\r\n"
                 + "Content-Type: text/html\r\n"
                 + "Server: JANIOS\r\n\r\n"
-                + page).getBytes(ascii);
-    }
-
-    /**
-     * Searches the base array for an occurrence of the term array. Performance
-     * is okayish, it tries to jump as far as it can after a mismatch.
-     *
-     * @param base the array to search in
-     * @param baseOffset the offset to start searching in the base array
-     * @param baseLimit the limit to search to in the base array
-     * @param term the array to search for
-     * @return the index of where the term array begins, -1 if the term array
-     * could not be found in the base array
-     */
-    public static int indexOf(byte[] base, int baseOffset, int baseLimit, byte[] term) {
-        int f;
-        for (int i = baseOffset; i < baseLimit; i++) {
-            f = 0;
-            for (int j = 0; j < term.length; j++) {
-                if (base[j + i] == term[j]) { // Match?
-                    if (j == term.length - 1) { // Finished searching?
-                        return i;
-                    } else if (f == 0 && term[0] == term[j]) {
-                        f = j;
-                    }
-                } else { // Missmatch
-                    if (j > 0) {
-                        if (f > 0) {
-                            i += f - 1;
-                            break;
-                        }
-                        i += j - 1;
-                    }
-                    break;
-                }
-            }
-        }
-        return -1;
+                + page).getBytes(ASCII);
     }
 }

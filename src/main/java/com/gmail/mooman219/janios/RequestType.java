@@ -20,7 +20,7 @@ public enum RequestType {
     private final byte[] identifier;
 
     private RequestType(String identifier) {
-        this.identifier = identifier.getBytes(Server.ascii);
+        this.identifier = identifier.getBytes(Server.ASCII);
     }
 
     /**
