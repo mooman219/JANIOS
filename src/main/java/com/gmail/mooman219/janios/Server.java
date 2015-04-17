@@ -184,10 +184,10 @@ public class Server {
     }
 
     public static byte[] generateResponse(ResponseType responceType, String page) {
-        return ("HTTP/1.0 " + responceType.getStatus() + "\n"
-                + "Content-Type: text/html\n"
-                + "Server: JANIOS\n\n"
-                + page).getBytes();
+        return ("HTTP/1.0 " + responceType.getStatus() + "\r\n"
+                + "Content-Type: text/html\r\n"
+                + "Server: JANIOS\r\n\r\n"
+                + page).getBytes(ascii);
     }
 
     /**
