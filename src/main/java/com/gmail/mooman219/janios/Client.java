@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * @author Joseph Cumbo (mooman219)
  */
-public class Client {
+public final class Client {
 
     private final ConcurrentLinkedQueue<ByteBuffer> queue = new ConcurrentLinkedQueue<>();
     private final SocketChannel socket;
@@ -34,12 +34,26 @@ public class Client {
         return buffer;
     }
 
-    public boolean process(ByteBuffer read) {
+    public boolean isClosed() {
+        return closed;
+    }
+
+    /**
+     * Appends the data in the given buffer to the client's internal buffer. The
+     * data is then parsed.
+     *
+     * @param read the data to append
+     * @return true if there were errors when parsing the data, false otherwise.
+     * If there were errors, the clients internal buffer is cleared.
+     * @throws IllegalStateException if the client is closed
+     */
+    public boolean read(ByteBuffer read) {
         if (closed) {
             throw new IllegalStateException("Client closed");
         }
         if (read.limit() > buffer.remaining()) {
             System.out.println("Overflow");
+            buffer.clear();
             return true;
         }
         buffer.put(read);
@@ -57,6 +71,30 @@ public class Client {
                 System.out.println(new String(buffer.array(), 0, buffer.position()));
         }
         return false;
+    }
+
+    /**
+     * Writes anything on the client's queue to the socket.
+     *
+     * @return true if all data on the client's queue was written, false if
+     * there's still pending data to be written
+     * @throws IOException if some other I/O error occurs
+     * @throws IllegalStateException if the client is closed
+     */
+    public boolean write() throws IOException {
+        if (closed) {
+            throw new IllegalStateException("Client closed");
+        }
+        ByteBuffer buf;
+        while ((buf = queue.peek()) != null) {
+            socket.write(buf);
+            if (!buf.hasRemaining()) {
+                queue.poll();
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void close() throws IOException {

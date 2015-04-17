@@ -10,7 +10,6 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -18,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Server {
 
+    public static final String ADDRESS = "localhost";
+    public static final int PORT = 8081;
     public static final Charset ASCII;
     public static final int BUFFER_SIZE = 3 * 1024;
     public static final BufferPool BUFFER_POOL = new BufferPool(BUFFER_SIZE, 1024);
@@ -34,6 +35,7 @@ public class Server {
         System.out.println("Found charset " + ASCII.displayName());
         System.out.println("Buffer size: " + BUFFER_SIZE);
         System.out.println("Buffer pool capacity: " + BUFFER_POOL.getCapacity());
+        System.out.println("Server address: " + ADDRESS + ":" + PORT);
     }
 
     private static final ConcurrentHashMap<SocketChannel, Client> clients = new ConcurrentHashMap<>();
@@ -52,7 +54,7 @@ public class Server {
 
     public static void main(String[] args) throws IOException {
         ServerSocketChannel ssc = ServerSocketChannel.open();
-        ssc.bind(new InetSocketAddress("localhost", 8081));
+        ssc.bind(new InetSocketAddress(ADDRESS, PORT));
         ssc.configureBlocking(false);
         Selector selector = Selector.open();
         ssc.register(selector, SelectionKey.OP_ACCEPT);
@@ -104,7 +106,7 @@ public class Server {
         }
 
         readBuffer.flip();
-        if (clients.get(socket).process(readBuffer)) {
+        if (client.read(readBuffer)) {
             System.out.println("Closing erronous connection to " + socket.getRemoteAddress().toString());
             client.close();
             clients.remove(socket);
@@ -134,15 +136,9 @@ public class Server {
 
     public static void write(SelectionKey key) throws IOException {
         SocketChannel socket = (SocketChannel) key.channel();
-        Queue<ByteBuffer> queue = clients.get(socket).getQueue();
-        ByteBuffer buf;
-        while ((buf = queue.peek()) != null) {
-            socket.write(buf);
-            if (!buf.hasRemaining()) {
-                queue.poll();
-            } else {
-                return;
-            }
+        Client client = clients.get(socket);
+        if (!client.write()) {
+            return;
         }
         System.out.println("Closed connection to " + socket.getRemoteAddress().toString());
         socket.close();
