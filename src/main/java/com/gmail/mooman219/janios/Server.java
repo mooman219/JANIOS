@@ -7,8 +7,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -17,57 +15,24 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Server {
 
-    public static final String ADDRESS = "localhost";
-    public static final int PORT = 8081;
-    public static final Charset ASCII = StandardCharsets.US_ASCII;
     public static final int BUFFER_SIZE = 3 * 1024;
-
-    static {
-        System.out.println("Found charset " + ASCII.displayName());
-        System.out.println("Buffer size: " + BUFFER_SIZE);
-        System.out.println("Server address: " + ADDRESS + ":" + PORT);
-    }
 
     private final ConcurrentHashMap<SocketChannel, Client> clients = new ConcurrentHashMap<>();
     private final ByteBuffer readBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
+    private final ClientPool clientPool;
     private final InetSocketAddress address;
 
-    /**
-     * Prints the given buffer in hex format from the 0 position to the limit.
-     *
-     * @param buffer the buffer to print
-     */
-    public static void printBuffer(ByteBuffer buffer) {
-        for (int i = 0; i < buffer.limit(); i++) {
-            System.out.format("%x ", buffer.get(i));
-        }
-    }
-
-    public static String toString(ByteBuffer buffer, int start, int length) {
-        int position = buffer.position();
-        int limit = buffer.limit();
-        buffer.position(start);
-        buffer.limit(start + length);
-        String result = Server.ASCII.decode(buffer).toString();
-        buffer.position(position);
-        buffer.limit(limit);
-        return result;
-    }
-
-    public static byte[] generateResponse(ResponseType responceType, String page) {
-        return ("HTTP/1.0 " + responceType.getStatus() + "\r\n"
-                + "Content-Type: text/html\r\n"
-                + "Server: JANIOS\r\n\r\n"
-                + page).getBytes(ASCII);
-    }
-
     public static void main(String[] args) throws IOException {
-        Server server = new Server(new InetSocketAddress(ADDRESS, PORT));
+        InetSocketAddress address = new InetSocketAddress("localhost", 8081);
+        int clientPoolSize = 512;
+
+        Server server = new Server(address, clientPoolSize);
         server.start();
     }
 
-    public Server(InetSocketAddress address) {
+    public Server(InetSocketAddress address, int clientPoolSize) {
         this.address = address;
+        this.clientPool = new ClientPool(clientPoolSize);
     }
 
     public void start() throws IOException {
@@ -76,6 +41,7 @@ public class Server {
         ssc.configureBlocking(false);
         Selector selector = Selector.open();
         ssc.register(selector, SelectionKey.OP_ACCEPT);
+        System.out.println("Server Started");
         while (true) {
             selector.select();
             for (Iterator<SelectionKey> iterator = selector.selectedKeys().iterator(); iterator.hasNext();) {
@@ -99,7 +65,7 @@ public class Server {
         SocketChannel sc = ssc.accept();
         sc.configureBlocking(false);
         sc.register(key.selector(), SelectionKey.OP_READ);
-        clients.put(sc, Client.CLIENT_POOL.get(sc));
+        clients.put(sc, clientPool.get(sc));
         System.out.println("Connected to " + sc.getRemoteAddress().toString());
     }
 

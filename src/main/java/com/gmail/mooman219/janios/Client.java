@@ -10,14 +10,14 @@ import java.util.LinkedList;
  */
 public final class Client {
 
-    public static final ClientPool CLIENT_POOL = new ClientPool(1024);
     private final LinkedList<ByteBuffer> queue = new LinkedList<>();
     private final ByteBuffer buffer = ByteBuffer.allocate(Server.BUFFER_SIZE);
+    private final ClientPool pool;
     private SocketChannel socket;
     private boolean closed = false;
 
-    protected Client(SocketChannel socket) {
-        this.socket = socket;
+    protected Client(ClientPool pool) {
+        this.pool = pool;
     }
 
     /**
@@ -75,7 +75,7 @@ public final class Client {
                 System.out.println("Erroneous data");
                 return true;
             default:
-                System.out.println(Server.toString(buffer, 0, buffer.limit()));
+                System.out.println(BufferHelper.toString(buffer, 0, buffer.limit()));
         }
         buffer.position(buffer.limit());
         buffer.limit(buffer.capacity());
@@ -109,7 +109,7 @@ public final class Client {
     /**
      * Closes the underlying socket and nullifies the state of the client. The
      * client should not be used or held reference to after close has been
-     * called.
+     * called as it can be reused by another connection.
      */
     public void close() {
         if (closed) {
@@ -123,6 +123,6 @@ public final class Client {
             e.printStackTrace();
         }
         socket = null;
-        CLIENT_POOL.redeem(this);
+        pool.redeem(this);
     }
 }

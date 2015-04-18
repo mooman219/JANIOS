@@ -1,6 +1,7 @@
 package com.gmail.mooman219.janios;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 /**
  * @author Joseph Cumbo (mooman219)
@@ -22,7 +23,7 @@ public enum RequestType {
     private final byte[] identifier;
 
     private RequestType(String identifier) {
-        this.identifier = identifier.getBytes(Server.ASCII);
+        this.identifier = identifier.getBytes(StandardCharsets.US_ASCII);
     }
 
     /**

@@ -22,14 +22,20 @@ public class ClientPool {
     public Client get(SocketChannel socket) {
         Client client = pool.poll();
         if (client == null) {
-            client = new Client(socket);
-        } else {
-            client.redeem(socket);
+            client = new Client(this);
         }
+        client.redeem(socket);
         return client;
     }
 
-    public void redeem(Client client) {
+    /**
+     * Adds the client back into the pool so it can be reused. The user is
+     * responsible for cleaning up any resources before returning the client to
+     * the pool.
+     *
+     * @param client the client to return to the pool
+     */
+    protected void redeem(Client client) {
         if (pool.size() > capacity) {
             return; // Let the GC handle the client.
         }

@@ -72,7 +72,7 @@ public class Request {
         if (end == 0) {
             return INCOMPLETE_REQUEST;
         }
-        String requestURL = Server.toString(buffer, start, end - start);
+        String requestURL = BufferHelper.toString(buffer, start, end - start);
 
         /**
          * Parse the http version.
@@ -90,7 +90,7 @@ public class Request {
         if (end == 0) {
             return INCOMPLETE_REQUEST;
         }
-        String httpVersion = Server.toString(buffer, start, end - start);
+        String httpVersion = BufferHelper.toString(buffer, start, end - start);
 
         return new Request(requestType, requestURL, httpVersion);
     }
