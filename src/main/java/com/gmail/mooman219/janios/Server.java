@@ -21,7 +21,6 @@ public class Server {
     public static final int PORT = 8081;
     public static final Charset ASCII;
     public static final int BUFFER_SIZE = 3 * 1024;
-    public static final BufferPool BUFFER_POOL = new BufferPool(BUFFER_SIZE, 1024);
 
     static {
         Map<String, Charset> charsets = Charset.availableCharsets();
@@ -34,7 +33,6 @@ public class Server {
         }
         System.out.println("Found charset " + ASCII.displayName());
         System.out.println("Buffer size: " + BUFFER_SIZE);
-        System.out.println("Buffer pool capacity: " + BUFFER_POOL.getCapacity());
         System.out.println("Server address: " + ADDRESS + ":" + PORT);
     }
 
@@ -50,6 +48,17 @@ public class Server {
         for (int i = 0; i < buffer.limit(); i++) {
             System.out.format("%x ", buffer.get(i));
         }
+    }
+
+    public static String toString(ByteBuffer buffer, int start, int length) {
+        int position = buffer.position();
+        int limit = buffer.limit();
+        buffer.position(start);
+        buffer.limit(start + length);
+        String result = Server.ASCII.decode(buffer).toString();
+        buffer.position(position);
+        buffer.limit(limit);
+        return result;
     }
 
     public static void main(String[] args) throws IOException {
@@ -81,7 +90,7 @@ public class Server {
         SocketChannel sc = ssc.accept();
         sc.configureBlocking(false);
         sc.register(key.selector(), SelectionKey.OP_READ);
-        clients.put(sc, new Client(sc));
+        clients.put(sc, Client.CLIENT_POOL.get(sc));
         System.out.println("Connected to " + sc.getRemoteAddress().toString());
     }
 
@@ -100,16 +109,16 @@ public class Server {
         Client client = clients.get(socket);
         if (read == -1) {
             System.out.println("Lost connection to " + socket.getRemoteAddress().toString());
-            client.close();
             clients.remove(socket);
+            client.close();
             return;
         }
 
         readBuffer.flip();
         if (client.read(readBuffer)) {
             System.out.println("Closing erronous connection to " + socket.getRemoteAddress().toString());
-            client.close();
             clients.remove(socket);
+            client.close();
             return;
         }
 

@@ -3,39 +3,47 @@ package com.gmail.mooman219.janios;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.LinkedList;
 
 /**
  * @author Joseph Cumbo (mooman219)
  */
 public final class Client {
 
-    private final ConcurrentLinkedQueue<ByteBuffer> queue = new ConcurrentLinkedQueue<>();
-    private final SocketChannel socket;
-    private ByteBuffer buffer;
+    public static final ClientPool CLIENT_POOL = new ClientPool(1024);
+    private final LinkedList<ByteBuffer> queue = new LinkedList<>();
+    private final ByteBuffer buffer = ByteBuffer.allocate(Server.BUFFER_SIZE);
+    private SocketChannel socket;
     private boolean closed = false;
 
-    public Client(SocketChannel socket) {
-        this.buffer = Server.BUFFER_POOL.getByteBuffer();
+    protected Client(SocketChannel socket) {
         this.socket = socket;
     }
 
-    public ConcurrentLinkedQueue<ByteBuffer> getQueue() {
-        if (closed) {
-            throw new IllegalStateException("Client closed");
-        }
-        return queue;
+    /**
+     * Resets the client state to that of a new client.
+     *
+     * @param socket the socket to assign the new client
+     */
+    protected void redeem(SocketChannel socket) {
+        this.socket = socket;
+        this.closed = false;
     }
 
-    public ByteBuffer getBuffer() {
-        if (closed) {
-            throw new IllegalStateException("Client closed");
-        }
-        return buffer;
-    }
-
+    /**
+     * Checks if the client has been closed.
+     *
+     * @return true if the client has been closed, false otherwise
+     */
     public boolean isClosed() {
         return closed;
+    }
+
+    public void queue(ByteBuffer buffer) {
+        if (closed) {
+            throw new IllegalStateException("Client closed");
+        }
+        queue.add(buffer);
     }
 
     /**
@@ -51,13 +59,13 @@ public final class Client {
         if (closed) {
             throw new IllegalStateException("Client closed");
         }
-        if (read.limit() > buffer.remaining()) {
+        if (read.remaining() > buffer.remaining()) {
             System.out.println("Overflow");
-            buffer.clear();
             return true;
         }
         buffer.put(read);
-        Request request = Request.parse(buffer.array(), buffer.position());
+        buffer.flip();
+        Request request = Request.parse(buffer);
         System.out.print("\n" + request.toString() + "\n");
         switch (request.getRequestType()) {
             case INCOMPLETE:
@@ -65,11 +73,12 @@ public final class Client {
                 break;
             case ERRONEOUS:
                 System.out.println("Erroneous data");
-                buffer.clear();
                 return true;
             default:
-                System.out.println(new String(buffer.array(), 0, buffer.position()));
+                System.out.println(Server.toString(buffer, 0, buffer.limit()));
         }
+        buffer.position(buffer.limit());
+        buffer.limit(buffer.capacity());
         return false;
     }
 
@@ -97,13 +106,23 @@ public final class Client {
         return true;
     }
 
-    public void close() throws IOException {
+    /**
+     * Closes the underlying socket and nullifies the state of the client. The
+     * client should not be used or held reference to after close has been
+     * called.
+     */
+    public void close() {
         if (closed) {
             throw new IllegalStateException("Client closed");
         }
         closed = true;
-        Server.BUFFER_POOL.returnByteBuffer(buffer);
-        buffer = null;
-        socket.close();
+        buffer.clear();
+        try {
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        socket = null;
+        CLIENT_POOL.redeem(this);
     }
 }

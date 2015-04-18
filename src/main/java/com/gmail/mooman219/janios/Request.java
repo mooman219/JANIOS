@@ -1,5 +1,7 @@
 package com.gmail.mooman219.janios;
 
+import java.nio.ByteBuffer;
+
 /**
  * @author Joseph Cumbo (mooman219)
  */
@@ -34,11 +36,11 @@ public class Request {
         return "(Request: \"" + requestType.name() + "\", \"" + (requestURL == null ? "*" : requestURL) + "\", \"" + (httpVersion == null ? "*" : httpVersion) + "\")";
     }
 
-    public static Request parse(byte[] base, int baseLimit) {
+    public static Request parse(ByteBuffer buffer) {
         /**
          * Parse the request type
          */
-        RequestType requestType = RequestType.getRequestType(base, baseLimit);
+        RequestType requestType = RequestType.getRequestType(buffer);
         switch (requestType) {
             case INCOMPLETE:
                 return INCOMPLETE_REQUEST;
@@ -53,42 +55,42 @@ public class Request {
         int start = position + 1;
         int end = 0;
 
-        if (baseLimit < position) {
+        if (buffer.limit() < position) {
             return INCOMPLETE_REQUEST;
-        } else if (base[position] != 0x20) { // ASCII Space
+        } else if (buffer.get(position) != 0x20) { // ASCII Space
             return ERRONEOUS_REQUEST;
         }
         position = start;
-        for (; position < baseLimit; position++) {
-            if (base[position] == 0x20) { // ASCII Space
+        for (; position < buffer.limit(); position++) {
+            if (buffer.get(position) == 0x20) { // ASCII Space
                 end = position;
                 break;
-            } else if (base[position] < 0x020) { // Unsupported characters
+            } else if (buffer.get(position) < 0x020) { // Unsupported characters
                 return ERRONEOUS_REQUEST;
             }
         }
         if (end == 0) {
             return INCOMPLETE_REQUEST;
         }
-        String requestURL = new String(base, start, end - start);
+        String requestURL = Server.toString(buffer, start, end - start);
 
         /**
          * Parse the http version.
          */
         start = ++position;
         end = 0;
-        for (; position < baseLimit; position++) {
-            if (base[position] == 0x0D || base[position] == 0x0A) { // ASCII New Line or ASCII Carriage Return
+        for (; position < buffer.limit(); position++) {
+            if (buffer.get(position) == 0x0D || buffer.get(position) == 0x0A) { // ASCII New Line or ASCII Carriage Return
                 end = position;
                 break;
-            } else if (base[position] < 0x021) { // Unsupported characters
+            } else if (buffer.get(position) < 0x021) { // Unsupported characters
                 return ERRONEOUS_REQUEST;
             }
         }
         if (end == 0) {
             return INCOMPLETE_REQUEST;
         }
-        String httpVersion = new String(base, start, end - start);
+        String httpVersion = Server.toString(buffer, start, end - start);
 
         return new Request(requestType, requestURL, httpVersion);
     }

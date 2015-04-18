@@ -25,7 +25,7 @@ public class BufferPool {
         return capacity;
     }
 
-    public ByteBuffer getByteBuffer() {
+    public ByteBuffer get() {
         ByteBuffer buffer = pool.poll();
         if (buffer == null) {
             buffer = ByteBuffer.allocate(bufferSize);
@@ -35,7 +35,7 @@ public class BufferPool {
         return buffer;
     }
 
-    public void returnByteBuffer(ByteBuffer buffer) {
+    public void redeem(ByteBuffer buffer) {
         if (buffer.capacity() != bufferSize) {
             throw new IllegalArgumentException("Expected buffer size of : " + bufferSize + " got: " + buffer.capacity());
         } else if (pool.size() > capacity) {

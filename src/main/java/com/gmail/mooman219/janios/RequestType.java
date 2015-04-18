@@ -1,5 +1,7 @@
 package com.gmail.mooman219.janios;
 
+import java.nio.ByteBuffer;
+
 /**
  * @author Joseph Cumbo (mooman219)
  */
@@ -35,40 +37,39 @@ public enum RequestType {
     /**
      * Parses the base array for a request type if one is present.
      *
-     * @param base the base array to scan
-     * @param baseLimit the length of usable data in the base array
+     * @param buffer the buffer to scan
      * @return the request type present in the base array. If one is is not
      * present, ERRONEOUS is returned. If there isn't enough data in the base
      * array to check, INCOMPLETE is returned.
      */
-    public static RequestType getRequestType(byte[] base, int baseLimit) {
-        if (baseLimit < 3) {
+    public static RequestType getRequestType(ByteBuffer buffer) {
+        if (buffer.limit() < 3) {
             return INCOMPLETE;
         }
-        switch (base[0]) {
+        switch (buffer.get(0)) {
             case 0x43: // ASCII C
-                return getStatus(base, baseLimit, CONNECT);
+                return getStatus(buffer, CONNECT);
             case 0x44: // ASCII D
-                return getStatus(base, baseLimit, DELETE);
+                return getStatus(buffer, DELETE);
             case 0x47: // ASCII G
-                return getStatus(base, baseLimit, GET);
+                return getStatus(buffer, GET);
             case 0x48: // ASCII H
-                return getStatus(base, baseLimit, HEAD);
+                return getStatus(buffer, HEAD);
             case 0x4F: // ASCII O
-                return getStatus(base, baseLimit, OPTIONS);
+                return getStatus(buffer, OPTIONS);
             case 0x50: // ASCII P
-                switch (base[1]) {
+                switch (buffer.get(1)) {
                     case 0x41: // ASCII A
-                        return getStatus(base, baseLimit, PATCH);
+                        return getStatus(buffer, PATCH);
                     case 0x4F: // ASCII O
-                        return getStatus(base, baseLimit, POST);
+                        return getStatus(buffer, POST);
                     case 0x55: // ASCII U
-                        return getStatus(base, baseLimit, PUT);
+                        return getStatus(buffer, PUT);
                     default:
                         return ERRONEOUS;
                 }
             case 0x54: // ASCII T
-                return getStatus(base, baseLimit, TRACE);
+                return getStatus(buffer, TRACE);
             default:
                 return ERRONEOUS;
         }
@@ -85,10 +86,10 @@ public enum RequestType {
      * given type then ERRONEOUS is returned. If there are no issues, then the
      * given type is returned
      */
-    private static RequestType getStatus(byte[] base, int baseLimit, RequestType type) {
-        if (baseLimit >= type.identifier.length) {
+    private static RequestType getStatus(ByteBuffer buffer, RequestType type) {
+        if (buffer.limit() >= type.identifier.length) {
             for (int i = 0; i < type.identifier.length; i++) {
-                if (base[i] != type.identifier[i]) {
+                if (buffer.get(i) != type.identifier[i]) {
                     return ERRONEOUS;
                 }
             }
