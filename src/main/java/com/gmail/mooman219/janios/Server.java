@@ -8,8 +8,8 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -19,25 +19,18 @@ public class Server {
 
     public static final String ADDRESS = "localhost";
     public static final int PORT = 8081;
-    public static final Charset ASCII;
+    public static final Charset ASCII = StandardCharsets.US_ASCII;
     public static final int BUFFER_SIZE = 3 * 1024;
 
     static {
-        Map<String, Charset> charsets = Charset.availableCharsets();
-        if (charsets.containsKey("US-ASCII")) {
-            ASCII = charsets.get("US-ASCII");
-        } else if (charsets.containsKey("ASCII")) {
-            ASCII = charsets.get("ASCII");
-        } else {
-            throw new Error("System unable to encode to ASCII.");
-        }
         System.out.println("Found charset " + ASCII.displayName());
         System.out.println("Buffer size: " + BUFFER_SIZE);
         System.out.println("Server address: " + ADDRESS + ":" + PORT);
     }
 
-    private static final ConcurrentHashMap<SocketChannel, Client> clients = new ConcurrentHashMap<>();
-    private static final ByteBuffer readBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
+    private final ConcurrentHashMap<SocketChannel, Client> clients = new ConcurrentHashMap<>();
+    private final ByteBuffer readBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
+    private final InetSocketAddress address;
 
     /**
      * Prints the given buffer in hex format from the 0 position to the limit.
@@ -61,9 +54,25 @@ public class Server {
         return result;
     }
 
+    public static byte[] generateResponse(ResponseType responceType, String page) {
+        return ("HTTP/1.0 " + responceType.getStatus() + "\r\n"
+                + "Content-Type: text/html\r\n"
+                + "Server: JANIOS\r\n\r\n"
+                + page).getBytes(ASCII);
+    }
+
     public static void main(String[] args) throws IOException {
+        Server server = new Server(new InetSocketAddress(ADDRESS, PORT));
+        server.start();
+    }
+
+    public Server(InetSocketAddress address) {
+        this.address = address;
+    }
+
+    public void start() throws IOException {
         ServerSocketChannel ssc = ServerSocketChannel.open();
-        ssc.bind(new InetSocketAddress(ADDRESS, PORT));
+        ssc.bind(address);
         ssc.configureBlocking(false);
         Selector selector = Selector.open();
         ssc.register(selector, SelectionKey.OP_ACCEPT);
@@ -85,7 +94,7 @@ public class Server {
         }
     }
 
-    public static void accept(SelectionKey key) throws IOException {
+    private void accept(SelectionKey key) throws IOException {
         ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
         SocketChannel sc = ssc.accept();
         sc.configureBlocking(false);
@@ -94,7 +103,7 @@ public class Server {
         System.out.println("Connected to " + sc.getRemoteAddress().toString());
     }
 
-    public static void read(SelectionKey key) throws IOException {
+    private void read(SelectionKey key) throws IOException {
         SocketChannel socket = (SocketChannel) key.channel();
         readBuffer.clear();
         int read = -1;
@@ -143,7 +152,7 @@ public class Server {
 //        socket.register(key.selector(), SelectionKey.OP_WRITE);
     }
 
-    public static void write(SelectionKey key) throws IOException {
+    private void write(SelectionKey key) throws IOException {
         SocketChannel socket = (SocketChannel) key.channel();
         Client client = clients.get(socket);
         if (!client.write()) {
@@ -152,12 +161,5 @@ public class Server {
         System.out.println("Closed connection to " + socket.getRemoteAddress().toString());
         socket.close();
         clients.remove(socket);
-    }
-
-    public static byte[] generateResponse(ResponseType responceType, String page) {
-        return ("HTTP/1.0 " + responceType.getStatus() + "\r\n"
-                + "Content-Type: text/html\r\n"
-                + "Server: JANIOS\r\n\r\n"
-                + page).getBytes(ASCII);
     }
 }
