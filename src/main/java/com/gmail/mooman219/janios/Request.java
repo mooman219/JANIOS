@@ -7,8 +7,8 @@ import java.nio.ByteBuffer;
  */
 public class Request {
 
-    private final static Request INCOMPLETE_REQUEST = new Request(RequestType.INCOMPLETE, null, null);
-    private final static Request ERRONEOUS_REQUEST = new Request(RequestType.ERRONEOUS, null, null);
+    public final static Request INCOMPLETE_REQUEST = new Request(RequestType.INCOMPLETE, null, null);
+    public final static Request ERRONEOUS_REQUEST = new Request(RequestType.ERRONEOUS, null, null);
     private final RequestType requestType;
     private final String requestURL;
     private final String httpVersion;

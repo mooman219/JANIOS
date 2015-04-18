@@ -90,7 +90,8 @@ public class Server {
         }
 
         readBuffer.flip();
-        if (client.read(readBuffer)) {
+        Request request = client.read(readBuffer);
+        if (request.getRequestType() == RequestType.ERRONEOUS) {
             System.out.println("Closing erronous connection to " + socket.getRemoteAddress().toString());
             clients.remove(socket);
             client.close();

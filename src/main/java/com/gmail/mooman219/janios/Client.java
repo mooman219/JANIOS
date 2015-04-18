@@ -51,35 +51,25 @@ public final class Client {
      * data is then parsed.
      *
      * @param read the data to append
-     * @return true if there were errors when parsing the data, false otherwise.
-     * If there were errors, the clients internal buffer is cleared.
+     * @return a request object reflecting the state of the internal buffer
      * @throws IllegalStateException if the client is closed
      */
-    public boolean read(ByteBuffer read) {
+    public Request read(ByteBuffer read) {
         if (closed) {
             throw new IllegalStateException("Client closed");
         }
         if (read.remaining() > buffer.remaining()) {
             System.out.println("Overflow");
-            return true;
+            return Request.ERRONEOUS_REQUEST;
         }
         buffer.put(read);
         buffer.flip();
         Request request = Request.parse(buffer);
         System.out.print("\n" + request.toString() + "\n");
-        switch (request.getRequestType()) {
-            case INCOMPLETE:
-                System.out.println("Incomplete data");
-                break;
-            case ERRONEOUS:
-                System.out.println("Erroneous data");
-                return true;
-            default:
-                System.out.println(BufferHelper.toString(buffer, 0, buffer.limit()));
-        }
+        System.out.println(BufferHelper.toString(buffer, 0, buffer.limit()));
         buffer.position(buffer.limit());
         buffer.limit(buffer.capacity());
-        return false;
+        return request;
     }
 
     /**
